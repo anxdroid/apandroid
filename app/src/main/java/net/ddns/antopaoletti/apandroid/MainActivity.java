@@ -5,9 +5,8 @@ import android.content.ContentValues;
 import android.content.DialogInterface;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.text.format.DateFormat;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
@@ -41,17 +40,122 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
 import java.util.zip.GZIPInputStream;
 
 public class MainActivity extends AppCompatActivity {
 
-    private String TAG = MainActivity.class.getSimpleName();
-    private ListView lv;
     private static GraphView graph;
+    public String lastTimestamp = "";
+    public double mobAvg = 0;
+    public int mobAvgNum = 100;
     ArrayList<HashMap<String, String>> tempList;
     //HashMap<String, String> values = null;
+    LineGraphSeries<DataPoint> series;
+    private String TAG = MainActivity.class.getSimpleName();
+    private ListView lv;
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    private GoogleApiClient client;
+
+    private InputStream getStream(String url) {
+        try {
+            URL myurl = new URL(url);
+            URLConnection urlConnection = myurl.openConnection();
+            urlConnection.setConnectTimeout(1000);
+            return urlConnection.getInputStream();
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.temp_graph);
+        //new MyAsyncTask().execute();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        //client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
+
+        tempList = new ArrayList<>();
+        lv = (ListView) findViewById(R.id.list);
+
+        graph = (GraphView) findViewById(R.id.graph);
+        // activate horizontal zooming and scrolling
+        graph.getViewport().setScalable(true);
+
+// activate horizontal scrolling
+        graph.getViewport().setScrollable(true);
+
+// activate horizontal and vertical zooming and scrolling
+        graph.getViewport().setScalableY(true);
+
+// activate vertical scrolling
+        graph.getViewport().setScrollableY(true);
+
+        series = new LineGraphSeries<>();
+        graph.addSeries(this.series);
+        graph.getGridLabelRenderer().setLabelFormatter(new DateAsXAxisLabelFormatter(this, new SimpleDateFormat("dd-MM HH:mm:ss")));
+        //graph.getGridLabelRenderer().setNumHorizontalLabels(3);
+        graph.getGridLabelRenderer().setTextSize(16);
+        graph.getViewport().setXAxisBoundsManual(true);
+
+// as we use dates as labels, the human rounding to nice readable numbers
+// is not necessary
+        graph.getGridLabelRenderer().setHumanRounding(false);
+
+
+        //new GetContacts().execute();
+        //new GetTemps().execute();
+
+        final GetTemps sensors = new GetTemps(this);
+        final Button button_refresh = (Button) findViewById(R.id.button_refresh);
+        button_refresh.setOnClickListener(new MyOnClickListener(this));
+    }
+
+    public void enableButtonRefresh() {
+        final Button button_refresh = (Button) findViewById(R.id.button_refresh);
+        button_refresh.setEnabled(true);
+    }
+
+    /**
+     * ATTENTION: This was auto-generated to implement the App Indexing API.
+     * See https://g.co/AppIndexing/AndroidStudio for more information.
+     */
+    public Action getIndexApiAction() {
+        Thing object = new Thing.Builder()
+                .setName("Main Page") // TODO: Define a title for the content shown.
+                // TODO: Make sure this auto-generated URL is correct.
+                .setUrl(Uri.parse("http://[ENTER-YOUR-URL-HERE]"))
+                .build();
+        return new Action.Builder(Action.TYPE_VIEW)
+                .setObject(object)
+                .setActionStatus(Action.STATUS_TYPE_COMPLETED)
+                .build();
+    }
+
+    @Override
+    public void onStart() {
+        super.onStart();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        //client.connect();
+        //AppIndex.AppIndexApi.start(client, getIndexApiAction());
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+
+        // ATTENTION: This was auto-generated to implement the App Indexing API.
+        // See https://g.co/AppIndexing/AndroidStudio for more information.
+        //AppIndex.AppIndexApi.end(client, getIndexApiAction());
+        //client.disconnect();
+    }
 
     public class MyOnClickListener implements View.OnClickListener
     {
@@ -70,10 +174,14 @@ public class MainActivity extends AppCompatActivity {
             sensors.execute();
         }
 
-    };
+    }
 
     private class GetTemps extends AsyncTask<Void, Void, Void> {
-        public MainActivity activity;
+        private MainActivity activity;
+
+        public GetTemps(MainActivity activity) {
+            this.activity = activity;
+        }
 
         @Override
         protected void onPreExecute() {
@@ -81,13 +189,6 @@ public class MainActivity extends AppCompatActivity {
             Toast.makeText(MainActivity.this,"Json Data is downloading",Toast.LENGTH_LONG).show();
 
         }
-
-
-        public GetTemps(MainActivity a)
-        {
-            this.activity = a;
-        }
-
 
         public String decompress(byte[] compressed) throws IOException {
             final int BUFFER_SIZE = 32;
@@ -109,10 +210,15 @@ public class MainActivity extends AppCompatActivity {
             //values = new HashMap<String, String>();
             HttpHandler sh = new HttpHandler();
             // Making a request to url and getting response
-            String url = "http://antopaoletti.ddns.net:10080/temp/export.php?numSamples=20";
+            String url = "http://antopaoletti.ddns.net:10080/temp/export.php?numSamples=20000";
+            if (!this.activity.lastTimestamp.equals("")) {
+                url += "&from=" + this.activity.lastTimestamp.replace(" ", "%20");
+            }
+            Log.d(TAG, "Url: " + url);
             String jsonStr = sh.makeServiceCall(url, "anto", "resistore");
 
-            Log.e(TAG, "Response from url: " + jsonStr);
+            Log.d(TAG, "Response from url: " + jsonStr);
+            tempList = new ArrayList<>();
             if (jsonStr != null) {
                 try {
                     JSONObject jsonObj = new JSONObject(jsonStr);
@@ -131,10 +237,27 @@ public class MainActivity extends AppCompatActivity {
 
                         // adding each child node to HashMap key => value
                         HashMap<String, String> values = new HashMap<String, String>();
+
+
+                        int mobAvgStart = i - this.activity.mobAvgNum;
+                        if (mobAvgStart < 0) {
+                            mobAvgStart = 0;
+                        }
+                        this.activity.mobAvg = 0;
+                        for (int j = mobAvgStart; j <= i; j++) {
+                            JSONObject c1 = data.getJSONObject(j);
+                            String value1 = c.getString("value");
+                            this.activity.mobAvg += new Double(value1).doubleValue();
+                        }
+                        this.activity.mobAvg /= i - mobAvgStart + 1;
+
+
                         values.put("timestamp", timestamp);
-                        values.put("value", value);
+                        this.activity.lastTimestamp = timestamp;
+                        //values.put("value", value);
+                        values.put("value", new Double(this.activity.mobAvg).toString());
                         //values.put(timestamp, value);
-                        Log.d(TAG, timestamp+" "+value);
+                        Log.d(TAG, timestamp + " " + value + " " + this.activity.mobAvg + "[" + mobAvgStart + ", " + i + "]");
 
                         // adding contact to contact list
                         tempList.add(values);
@@ -176,7 +299,7 @@ public class MainActivity extends AppCompatActivity {
                     new int[]{R.id.timestamp, R.id.value});
             lv.setAdapter(adapter);
             */
-            LineGraphSeries<DataPoint> series = new LineGraphSeries<>();
+
             SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
             //Iterator it = values.entrySet().iterator();
@@ -195,14 +318,13 @@ public class MainActivity extends AppCompatActivity {
                     Date date = sdf.parse(timestamp);
                     Log.d(TAG, timestamp+" "+date.toString()+" "+doubleValue);
                     DataPoint datapoint = new DataPoint(date, doubleValue.doubleValue());
-                    series.appendData(datapoint, true, 100);
+                    this.activity.series.appendData(datapoint, true, 10000);
                 } catch (ParseException e) {
                     e.printStackTrace();
                 }
 
                 //it.remove(); // avoids a ConcurrentModificationException
             }
-            this.activity.setGraphData(series);
             this.activity.enableButtonRefresh();
 
 
@@ -376,114 +498,4 @@ public class MainActivity extends AppCompatActivity {
             } // catch (JSONException e)
         } // protected void onPostExecute(Void v)
     } //class MyAsyncTask extends AsyncTask<String, String, Void>
-
-
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
-    private GoogleApiClient client;
-
-    private InputStream getStream(String url) {
-        try {
-            URL myurl = new URL(url);
-            URLConnection urlConnection = myurl.openConnection();
-            urlConnection.setConnectTimeout(1000);
-            return urlConnection.getInputStream();
-        } catch (Exception ex) {
-            return null;
-        }
-    }
-
-    public static void setGraphData(LineGraphSeries<DataPoint> series) {
-        graph.removeAllSeries();
-        graph.addSeries(series);
-        //graph.getViewport().setMinX(series.getLowestValueX());
-        //graph.getViewport().setMaxX(series.getHighestValueX());
-    }
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.temp_graph);
-        //new MyAsyncTask().execute();
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        //client = new GoogleApiClient.Builder(this).addApi(AppIndex.API).build();
-
-        tempList = new ArrayList<>();
-        lv = (ListView) findViewById(R.id.list);
-
-        graph = (GraphView) findViewById(R.id.graph);
-
-        /*
-        LineGraphSeries<DataPoint> series = new LineGraphSeries<>(new DataPoint[] {
-                new DataPoint(0, 1),
-                new DataPoint(1, 5),
-                new DataPoint(2, 3)
-        });
-        */
-
-        //graph.addSeries(series);
-
-        graph.getGridLabelRenderer().setLabelFormatter(new DateAsXAxisLabelFormatter(this));
-        graph.getGridLabelRenderer().setNumHorizontalLabels(3);
-        //graph.getViewport().setXAxisBoundsManual(true);
-
-// as we use dates as labels, the human rounding to nice readable numbers
-// is not necessary
-        graph.getGridLabelRenderer().setHumanRounding(false);
-
-        //setGraphData(series);
-
-
-        //new GetContacts().execute();
-        //new GetTemps().execute();
-
-        final GetTemps sensors = new GetTemps(this);
-        final Button button_refresh = (Button) findViewById(R.id.button_refresh);
-        button_refresh.setOnClickListener(new MyOnClickListener(this));
-    }
-
-    public void enableButtonRefresh() {
-        final Button button_refresh = (Button) findViewById(R.id.button_refresh);
-        button_refresh.setEnabled(true);
-    }
-
-    /**
-     * ATTENTION: This was auto-generated to implement the App Indexing API.
-     * See https://g.co/AppIndexing/AndroidStudio for more information.
-     */
-    public Action getIndexApiAction() {
-        Thing object = new Thing.Builder()
-                .setName("Main Page") // TODO: Define a title for the content shown.
-                // TODO: Make sure this auto-generated URL is correct.
-                .setUrl(Uri.parse("http://[ENTER-YOUR-URL-HERE]"))
-                .build();
-        return new Action.Builder(Action.TYPE_VIEW)
-                .setObject(object)
-                .setActionStatus(Action.STATUS_TYPE_COMPLETED)
-                .build();
-    }
-
-    @Override
-    public void onStart() {
-        super.onStart();
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        //client.connect();
-        //AppIndex.AppIndexApi.start(client, getIndexApiAction());
-    }
-
-    @Override
-    public void onStop() {
-        super.onStop();
-
-        // ATTENTION: This was auto-generated to implement the App Indexing API.
-        // See https://g.co/AppIndexing/AndroidStudio for more information.
-        //AppIndex.AppIndexApi.end(client, getIndexApiAction());
-        //client.disconnect();
-    }
 }
