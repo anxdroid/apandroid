@@ -59,6 +59,14 @@ public class MainActivity extends AppCompatActivity {
      */
     private GoogleApiClient client;
 
+    public void setGraphMinTime(Date time) {
+        graph.getViewport().setMinX(time.getTime());
+    }
+
+    public void setGraphMaxTime(Date time) {
+        graph.getViewport().setMaxX(time.getTime());
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -74,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
         lv = (ListView) findViewById(R.id.list);
 
         graph = (GraphView) findViewById(R.id.graph);
-        //graph.getViewport().setXAxisBoundsManual(true);
+
         // activate horizontal zooming and scrolling
         graph.getViewport().setScalable(true);
 // activate horizontal scrolling
@@ -83,13 +91,15 @@ public class MainActivity extends AppCompatActivity {
         graph.getViewport().setScalableY(true);
 // activate vertical scrolling
         graph.getViewport().setScrollableY(true);
+
+
         series = new LineGraphSeries<>();
         graph.addSeries(this.series);
-        graph.getGridLabelRenderer().setLabelFormatter(new DateAsXAxisLabelFormatter(this, new SimpleDateFormat("dd-MM HH:mm:ss")));
+        graph.getGridLabelRenderer().setLabelFormatter(new DateAsXAxisLabelFormatter(this, new SimpleDateFormat("dd/MM HH:mm")));
         //graph.getGridLabelRenderer().setNumHorizontalLabels(3);
         graph.getGridLabelRenderer().setTextSize(16);
         graph.getViewport().setXAxisBoundsManual(true);
-        graph.getGridLabelRenderer().setHumanRounding(false);
+        //graph.getGridLabelRenderer().setHumanRounding(false);
 
         final GetTemps sensors = new GetTemps(this);
         final Button button_refresh_temps = (Button) findViewById(R.id.button_refresh_temps);
@@ -345,7 +355,7 @@ public class MainActivity extends AppCompatActivity {
                             this.activity.lastTimestamp = timestamp;
                             this.activity.lastTimestampMin = timestamp.substring(0, 16);
                             //values.put("value", value);
-                            values.put("value", new Double(this.activity.mobAvg).toString());
+                            values.put("value", String.format("%.2f", this.activity.mobAvg).replace(",", "."));
                             //values.put(timestamp, value);
                             Log.d(TAG, timestamp + " " + this.activity.lastTimestampMin + " " + value + " " + this.activity.mobAvg + "[" + mobAvgStart + ", " + i + "]");
 
@@ -411,9 +421,13 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     if (timestamp != null) {
                         Date date = sdf.parse(timestamp);
+                        if (i == 0) {
+                            //this.activity.setGraphMinTime(date);
+                            Log.d(TAG, "Min: "+date.getTime());
+                        }
                         Log.d(TAG, timestamp + " " + date.toString() + " " + doubleValue);
                         DataPoint datapoint = new DataPoint(date, doubleValue.doubleValue());
-                        this.activity.series.appendData(datapoint, true, 10000);
+                        this.activity.series.appendData(datapoint, true, 3000);
                     }
                 } catch (ParseException e) {
                     e.printStackTrace();
@@ -425,6 +439,15 @@ public class MainActivity extends AppCompatActivity {
             if (tempList.size() > 0) {
                 HashMap<String, String> lastValues = tempList.get(tempList.size() - 1);
                 this.activity.showText(lastValues.get("timestamp") + ": " + lastValues.get("value") + Html.fromHtml(lastValues.get("unit")), R.id.text_last_temp);
+                Date date = null;
+                try {
+                    date = sdf.parse(lastValues.get("timestamp"));
+                } catch (ParseException e) {
+                    e.printStackTrace();
+                }
+                this.activity.setGraphMaxTime(date);
+                this.activity.setGraphMinTime(new Date(date.getTime() - (1000*60*60*2)));
+                Log.d(TAG, "Max: "+date.getTime());
             }
             this.activity.setButtonEnabled(R.id.button_refresh_temps, true);
 
