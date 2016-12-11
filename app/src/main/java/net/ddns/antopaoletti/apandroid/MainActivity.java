@@ -586,12 +586,16 @@ public class MainActivity extends AppCompatActivity {
                 HashMap<String, String> values = jobList.get(i);
                 String timestamp = values.get("timestamp");
                 String cmd = values.get("cmd");
+                String status = values.get("status");
 
                 TextView t = new TextView(this.activity);
                 t.setText(timestamp + ": ");
                 row.addView(t);
                 t = new TextView(this.activity);
                 t.setText(Html.fromHtml("<strong>" + cmd + "</strong>"));
+                row.addView(t);
+                t = new TextView(this.activity);
+                t.setText(Html.fromHtml("<em>" + status + "</em>"));
                 row.addView(t);
                 // add the TableRow to the TableLayout
                 table.addView(row, new TableLayout.LayoutParams(TableLayout.LayoutParams.WRAP_CONTENT, TableLayout.LayoutParams.WRAP_CONTENT));
