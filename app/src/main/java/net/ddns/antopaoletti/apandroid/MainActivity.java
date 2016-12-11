@@ -111,8 +111,8 @@ public class MainActivity extends AppCompatActivity {
         GetJobs task = new GetJobs(this);
         task.execute();
 
-        buttons_cmd.put(new Integer(R.id.button_on), "RELAY:0");
-        buttons_cmd.put(new Integer(R.id.button_off), "RELAY:1");
+        buttons_cmd.put(new Integer(R.id.button_on), "HEATERS:ON");
+        buttons_cmd.put(new Integer(R.id.button_off), "HEATERS:OFF");
 
         Iterator it = buttons_cmd.entrySet().iterator();
         while (it.hasNext()) {
