@@ -28,7 +28,6 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -43,7 +42,7 @@ public class MainActivity extends AppCompatActivity {
     public String lastTimestamp = "";
     public String lastTimestampMin = "";
     public double mobAvg = 0;
-    public int mobAvgNum = 100;
+    public int mobAvgNum = 30;
     public String doCmd = "";
     ArrayList<HashMap<String, String>> tempList;
     ArrayList<HashMap<String, String>> jobList;
@@ -306,36 +305,50 @@ public class MainActivity extends AppCompatActivity {
             //values = new HashMap<String, String>();
             HttpHandler sh = new HttpHandler();
             // Making a request to url and getting response
+
+            Date date = new Date();
+            long toDate = date.getTime();
+            long fromDate = toDate - 1000 * 60 * 60 * 24;
+            String url = "http://antopaoletti.ddns.net:10080/emoncms/feed/data.json?apikey=bb530ff605b6a4407759de172036c2fb&id=12&start=" + fromDate + "&end=" + toDate + "&interval=60";
+/*
             String url = "http://antopaoletti.ddns.net:10080/temp/export.php?numSamples=20000";
             if (!this.activity.lastTimestamp.equals("")) {
                 url += "&from=" + this.activity.lastTimestamp.replace(" ", "%20");
             }
             Log.d(TAG, "Url: " + url);
+*/
             String jsonStr = sh.makeServiceCall(url, "anto", "resistore");
 
-            Log.d(TAG, "Response from url: " + jsonStr);
+
+            //Log.d(TAG, "Response from url: " + jsonStr);
             tempList = new ArrayList<>();
             if (jsonStr != null) {
-                try {
+                //try {
+                String[] readings = jsonStr.replace("],[", ";").split(";");
+                    /*
                     JSONObject jsonObj = new JSONObject(jsonStr);
 
                     // Getting JSON Array node
                     JSONArray data = jsonObj.getJSONArray("data");
 
                     // looping through All Contacts
+                    */
+                //for (int i = 0; i < data.length(); i++) {
+                for (int i = 0; i < readings.length; i++) {
+                        /*
 
-                    for (int i = 0; i < data.length(); i++) {
                         JSONObject c = data.getJSONObject(i);
                         String timestamp = c.getString("timestamp");
                         String value = c.getString("value");
                         String unit = c.getString("unit");
 
-                        // tmp hash map for single contact
-                        //HashMap<String, String> values = new HashMap<>();
+                        */
 
-                        // adding each child node to HashMap key => value
-                        HashMap<String, String> values = new HashMap<String, String>();
-
+                    String reading = readings[i];
+                    reading = reading.replace("[", "").replace("]", "");
+                    Log.d(TAG, reading);
+                    String[] tokens = reading.split(",");
+                    String timestamp = tokens[0].substring(0, 13);
 
                         int mobAvgStart = i - this.activity.mobAvgNum;
                         if (mobAvgStart < 0) {
@@ -343,12 +356,22 @@ public class MainActivity extends AppCompatActivity {
                         }
                         this.activity.mobAvg = 0;
                         for (int j = mobAvgStart; j <= i; j++) {
+                            /*
                             JSONObject c1 = data.getJSONObject(j);
                             String value1 = c.getString("value");
                             this.activity.mobAvg += new Double(value1).doubleValue();
+                            */
+                            this.activity.mobAvg += new Double(tokens[1]).doubleValue();
                         }
                         this.activity.mobAvg /= i - mobAvgStart + 1;
-
+                    HashMap<String, String> values = new HashMap<String, String>();
+                    values.put("timestamp", timestamp);
+                    this.activity.lastTimestamp = timestamp;
+                    values.put("value", String.format("%.2f", this.activity.mobAvg).replace(",", "."));
+                    Log.d(TAG, timestamp + " " + this.activity.lastTimestampMin + " " + tokens[1] + " " + this.activity.mobAvg + "[" + mobAvgStart + ", " + i + "]");
+                    // adding contact to contact list
+                    tempList.add(values);
+/*
                         if (!timestamp.substring(0, 16).equals(this.activity.lastTimestampMin)) {
                             values.put("unit", unit);
                             values.put("timestamp", timestamp);
@@ -362,11 +385,13 @@ public class MainActivity extends AppCompatActivity {
                             // adding contact to contact list
                             tempList.add(values);
                         }
+*/
 
                     }
 
-
-                } catch (final JSONException e) {
+                /*
+                }
+                catch (final JSONException e) {
                     Log.e(TAG, "Json parsing error: " + e.getMessage());
                     runOnUiThread(new Runnable() {
                         @Override
@@ -378,6 +403,7 @@ public class MainActivity extends AppCompatActivity {
                     });
 
                 }
+                */
 
             } else {
                 Log.e(TAG, "Couldn't get json from server.");
@@ -418,27 +444,31 @@ public class MainActivity extends AppCompatActivity {
                 String value = values.get("value");
                 Double doubleValue = new Double(value);
 
-                try {
+                //try {
                     if (timestamp != null) {
-                        Date date = sdf.parse(timestamp);
+                        //Date date = sdf.parse(timestamp);
                         if (i == 0) {
                             //this.activity.setGraphMinTime(date);
-                            Log.d(TAG, "Min: "+date.getTime());
+                            //Log.d(TAG, "Min: "+date.getTime());
                         }
-                        Log.d(TAG, timestamp + " " + date.toString() + " " + doubleValue);
-                        DataPoint datapoint = new DataPoint(date, doubleValue.doubleValue());
+                        //Log.d(TAG, timestamp + " " + date.toString() + " " + doubleValue);
+                        //DataPoint datapoint = new DataPoint(date, doubleValue.doubleValue());
+                        DataPoint datapoint = new DataPoint(new Double(timestamp).doubleValue(), doubleValue.doubleValue());
                         this.activity.series.appendData(datapoint, true, 3000);
                     }
+                /*
                 } catch (ParseException e) {
                     e.printStackTrace();
                 }
+                */
 
                 //it.remove(); // avoids a ConcurrentModificationException
             }
 
             if (tempList.size() > 0) {
                 HashMap<String, String> lastValues = tempList.get(tempList.size() - 1);
-                this.activity.showText(lastValues.get("timestamp") + ": " + lastValues.get("value") + Html.fromHtml(lastValues.get("unit")), R.id.text_last_temp);
+                //this.activity.showText(lastValues.get("timestamp") + ": " + lastValues.get("value") + Html.fromHtml(lastValues.get("unit")), R.id.text_last_temp);
+                /*
                 Date date = null;
                 try {
                     date = sdf.parse(lastValues.get("timestamp"));
@@ -448,6 +478,10 @@ public class MainActivity extends AppCompatActivity {
                 this.activity.setGraphMaxTime(date);
                 this.activity.setGraphMinTime(new Date(date.getTime() - (1000*60*60*2)));
                 Log.d(TAG, "Max: "+date.getTime());
+                */
+                Date date = new Date(new Long(lastValues.get("timestamp")).longValue());
+                this.activity.setGraphMaxTime(date);
+                this.activity.setGraphMinTime(new Date(date.getTime() - (1000 * 60 * 60 * 24)));
             }
             this.activity.setButtonEnabled(R.id.button_refresh_temps, true);
 
